@@ -57,10 +57,10 @@ fun HomeScreen(
     ) { contentPadding ->
         Column(
             modifier = Modifier
-                .nestedScroll(scrollBehavior.nestedScrollConnection)
-                .imePadding()
                 .padding(contentPadding)
+                .nestedScroll(scrollBehavior.nestedScrollConnection)
                 .verticalScroll(rememberScrollState())
+                .imePadding()
                 .padding(all = 20.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
