@@ -1,0 +1,23 @@
+[package]
+name = "jni"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["lib", "cdylib"]
+
+[dependencies]
+android_logger = { version = "0.14", default-features = false }
+log = "0.4"
+
+[dependencies.lettre]
+version = "0.11"
+default-features = false
+features = ["smtp-transport", "hostname", "builder", "rustls-tls"]
+
+[dependencies.typed-jni]
+git = "https://github.com/SanmerDev/typed-jni-rs.git"
+
+[profile.release]
+strip = "symbols"
+lto = true

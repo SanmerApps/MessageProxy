@@ -79,6 +79,8 @@ android {
 }
 
 dependencies {
+    implementation(projects.jni)
+
     implementation(libs.accompanist.permissions)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.appcompat)
@@ -93,7 +95,6 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel)
     implementation(libs.androidx.lifecycle.viewmodel.savedstate)
     implementation(libs.androidx.navigation.compose)
-    implementation(libs.apache.commons.email2)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.datetime)
     implementation(libs.kotlinx.serialization.protobuf)

@@ -30,11 +30,38 @@ jobs:
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
+          distribution: zulu
           java-version: 21
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Set up Android NDK
+        env:
+          ANDROID_NDK_VERSION: 27.1.12297006
+        run: |
+          sdkmanager --install "ndk;${{ env.ANDROID_NDK_VERSION }}"
+          ANDROID_NDK_HOME="${ANDROID_HOME}/ndk/${{ env.ANDROID_NDK_VERSION }}"
+          ANDROID_NDK_TARGET=`ls ${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/`
+          ANDROID_NDK_BIN="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/${ANDROID_NDK_TARGET}/bin"
+          echo "$ANDROID_NDK_BIN" >> $GITHUB_PATH
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,x86_64-linux-android
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+
+      - name: Build dependencies
+        working-directory: jni/src/main/jni
+        env:
+          CARGO_TERM_COLOR: always
+          RUST_BACKTRACE: 1
+        run: sh build.sh
 
       - name: Build with Gradle
         run: ./gradlew assembleRelease
