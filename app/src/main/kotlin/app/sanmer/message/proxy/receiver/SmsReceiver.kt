@@ -15,13 +15,15 @@ import app.sanmer.message.proxy.ktx.toLocalDateTime
 import app.sanmer.message.proxy.repository.LogRepository
 import app.sanmer.message.proxy.repository.PreferenceRepository
 import dagger.hilt.android.AndroidEntryPoint
+import dev.sanmer.email.Lettre
+import dev.sanmer.email.Mailbox
+import dev.sanmer.email.Message
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.apache.commons.mail2.jakarta.SimpleEmail
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -39,21 +41,21 @@ class SmsReceiver : BroadcastReceiver() {
         when (intent?.action) {
             Telephony.Sms.Intents.SMS_RECEIVED_ACTION -> {
                 scope.launch {
-                    val message = Message.tryFromIntent(context, intent) ?: return@launch
+                    val sms = SMSMessage.tryFromIntent(context, intent) ?: return@launch
                     val preference = preference.data.first()
                     if (preference.smtp.username.isEmpty() || preference.email.isEmpty()) return@launch
 
                     runCatching {
-                        Timber.d("${message.from} -> ${message.to} (${message.dateTime})")
+                        Timber.d("${sms.from} -> ${sms.to} (${sms.dateTime})")
                         context.sendEmail(
                             smtp = preference.smtp,
                             email = preference.email,
-                            message = message
+                            sms = sms
                         )
                     }.onSuccess {
-                        log.insert(message.asLog(true))
+                        log.insert(sms.asLog(true))
                     }.onFailure {
-                        log.insert(message.asLog(false))
+                        log.insert(sms.asLog(false))
                         Timber.e(it)
                     }
                 }
@@ -61,7 +63,7 @@ class SmsReceiver : BroadcastReceiver() {
         }
     }
 
-    data class Message(
+    data class SMSMessage(
         val content: String,
         val timestamp: Long,
         val from: String?,
@@ -84,11 +86,11 @@ class SmsReceiver : BroadcastReceiver() {
         )
 
         companion object Default {
-            private fun getFromIntent(context: Context, intent: Intent): Message {
+            private fun getFromIntent(context: Context, intent: Intent): SMSMessage {
                 val subInfo = SubscriptionManagerCompat.getSubInfoFromIntent(context, intent)
                 val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
 
-                return Message(
+                return SMSMessage(
                     content = messages.joinToString(separator = "") { it.messageBody },
                     timestamp = messages.first().timestampMillis,
                     from = messages.first().originatingAddress,
@@ -107,21 +109,29 @@ class SmsReceiver : BroadcastReceiver() {
     private suspend fun Context.sendEmail(
         smtp: SmtpConfig,
         email: String,
-        message: Message
+        sms: SMSMessage
     ) = withContext(Dispatchers.IO) {
-        smtp.asSimpleEmail(message.from).also {
-            it.setSubject(message.subject(this@sendEmail))
-            it.setMsg(message.content)
-            it.addTo(email)
-        }.send()
-    }
+        val config = Lettre.Config(
+            server = smtp.server,
+            port = smtp.port,
+            username = smtp.username,
+            password = smtp.password
+        )
 
-    private fun SmtpConfig.asSimpleEmail(name: String? = null) = SimpleEmail().also {
-        it.setHostName(server)
-        it.setSmtpPort(port)
-        it.setAuthentication(username, password)
-        it.setSSLOnConnect(true)
-        it.setFrom(email.ifBlank { username }, name)
+        val message = Message(
+            from = Mailbox(
+                name = sms.from ?: "",
+                email = smtp.email.ifEmpty { smtp.username }
+            ),
+            to = Mailbox(
+                name = sms.to ?: "",
+                email = email
+            ),
+            subject = sms.subject(this@sendEmail),
+            body = sms.content
+        )
+
+        Lettre.send(config, message)
     }
 
     companion object Default {

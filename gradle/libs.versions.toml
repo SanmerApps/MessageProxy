@@ -13,7 +13,6 @@ androidxHiltNavigationCompose = "1.2.0"
 androidxLifecycle = "2.8.5"
 androidxNavigation = "2.8.0"
 androidxRoom = "2.6.1"
-apacheEmail2 = "2.0.0-M1"
 hilt = "2.52"
 kotlin = "2.0.20"
 kotlinxCoroutines = "1.8.1"
@@ -49,7 +48,6 @@ androidx-navigation-compose = { module = "androidx.navigation:navigation-compose
 androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "androidxRoom" }
 androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "androidxRoom" }
 androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "androidxRoom" }
-apache-commons-email2 = { module = "org.apache.commons:commons-email2-jakarta", version.ref = "apacheEmail2" }
 hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
 hilt-compiler = { module = "com.google.dagger:hilt-android-compiler", version.ref = "hilt" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
