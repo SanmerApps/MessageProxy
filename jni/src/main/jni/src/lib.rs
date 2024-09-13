@@ -7,6 +7,7 @@ use lettre::transport::smtp::client::{Tls, TlsParameters};
 use lettre::transport::smtp::Error as SmtpError;
 use lettre::{Address, Message, SmtpTransport, Transport};
 use log::LevelFilter;
+use std::fmt::{Display, Formatter};
 use typed_jni::sys::{jint, JavaVM, JNI_VERSION_1_6};
 use typed_jni::{Class, Context, JString, Object, ObjectType, Signature, Type};
 
@@ -39,25 +40,66 @@ macro_rules! get {
     };
 }
 
-macro_rules! catch {
+macro_rules! jni_throw {
+    ($($arg:tt)*) => {
+        let err = JRuntimeException::new(format!($($arg)*));
+        err.throw();
+    };
+}
+
+macro_rules! or_throw {
     ($block:expr) => {
         match $block {
-            Ok(v) => Some(v),
+            Ok(v) => v,
             Err(e) => {
-                log::error!("{:?}", e);
-                None
+                jni_throw!("{e:?}");
+                return;
             }
         }
     };
 }
 
-macro_rules! skip {
-    ($block:expr) => {{
-        let Some(value) = catch!($block) else {
-            return;
-        };
-        value
-    }};
+macro_rules! or_panic {
+    ($block:expr, $msg:expr) => {
+        match $block {
+            Ok(v) => v,
+            Err(_) => panic!($msg),
+        }
+    };
+}
+
+pub struct JRuntimeException {
+    message: String,
+}
+
+define_type!(JRuntimeException, "java/lang/RuntimeException");
+
+impl JRuntimeException {
+    fn new<S: Into<String>>(message: S) -> JRuntimeException {
+        JRuntimeException {
+            message: message.into(),
+        }
+    }
+
+    fn throw(self) {
+        Context::with_attached(|ctx| unsafe {
+            let class = or_panic!(
+                ctx.find_class(c"java/lang/RuntimeException"),
+                "BROKEN: find java/lang/RuntimeException failed"
+            );
+            let method = or_panic!(
+                ctx.find_method(&class, c"<init>", c"(Ljava/lang/String;)V"),
+                "BROKEN: find java/lang/RuntimeException.<init> failed"
+            );
+            let message = ctx.new_string(&self.message);
+            let message = (&message).into();
+            let throwable = or_panic!(
+                ctx.new_object(&class, method, [message]),
+                "BROKEN: create java/lang/RuntimeException failed"
+            );
+            ctx.throw(&throwable);
+        })
+    }
 }
 
 #[derive(Debug)]
@@ -68,12 +110,12 @@ pub struct JAddress {
 
 define_type!(JAddress, "dev/sanmer/email/Address");
 
-impl JAddress {
-    fn from_java<'ctx>(ctx: &'ctx Context, address: Object<'ctx, Self>) -> Self {
-        Self {
-            user: get_string!(ctx, address, "getUser"),
-            domain: get_string!(ctx, address, "getDomain"),
-        }
+impl From<Object<'_, JAddress>> for JAddress {
+    fn from(value: Object<'_, JAddress>) -> Self {
+        Context::with_attached(|ctx| Self {
+            user: get_string!(ctx, value, "getUser"),
+            domain: get_string!(ctx, value, "getDomain"),
+        })
     }
 }
 
@@ -93,16 +135,17 @@ pub struct JMailbox {
 
 define_type!(JMailbox, "dev/sanmer/email/Mailbox");
 
-impl JMailbox {
-    fn from_java<'ctx>(
-        ctx: &'ctx Context,
-        mailbox: Object<'ctx, Self>,
-    ) -> Result<Self, AddressError> {
-        let email: Object<JAddress> = get_object!(ctx, mailbox, "getEmail");
-        let email = JAddress::from_java(ctx, email);
-        Ok(Self {
-            name: get_string!(ctx, mailbox, "getName"),
-            email: email.try_into()?,
+impl TryFrom<Object<'_, JMailbox>> for JMailbox {
+    type Error = AddressError;
+
+    fn try_from(value: Object<'_, JMailbox>) -> Result<Self, Self::Error> {
+        Context::with_attached(|ctx| {
+            let email: Object<JAddress> = get_object!(ctx, value, "getEmail");
+            let email = JAddress::from(email);
+            Ok(Self {
+                name: get_string!(ctx, value, "getName"),
+                email: email.try_into()?,
+            })
         })
     }
 }
@@ -127,21 +170,32 @@ pub struct JMessage {
 
 define_type!(JMessage, "dev/sanmer/email/Message");
 
-impl JMessage {
-    fn from_java<'ctx>(
-        ctx: &'ctx Context,
-        message: Object<'ctx, Self>,
-    ) -> Result<Self, AddressError> {
-        let from: Object<JMailbox> = get_object!(ctx, message, "getFrom");
-        let from = JMailbox::from_java(ctx, from)?;
-        let to: Object<JMailbox> = get_object!(ctx, message, "getTo");
-        let to = JMailbox::from_java(ctx, to)?;
-        Ok(Self {
-            from: from.into(),
-            to: to.into(),
-            subject: get_string!(ctx, message, "getSubject"),
-            body: get_string!(ctx, message, "getBody"),
+impl TryFrom<Object<'_, JMessage>> for JMessage {
+    type Error = AddressError;
+
+    fn try_from(value: Object<'_, JMessage>) -> Result<Self, Self::Error> {
+        Context::with_attached(|ctx| {
+            let from: Object<JMailbox> = get_object!(ctx, value, "getFrom");
+            let from = JMailbox::try_from(from)?;
+            let to: Object<JMailbox> = get_object!(ctx, value, "getTo");
+            let to = JMailbox::try_from(to)?;
+            Ok(Self {
+                from: from.into(),
+                to: to.into(),
+                subject: get_string!(ctx, value, "getSubject"),
+                body: get_string!(ctx, value, "getBody"),
+            })
         })
+    }
+}
+
+impl Display for JMessage {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "from({:?} <{}>), to({:?} <{}>)",
+            self.from.name, self.from.email, self.to.name, self.to.email
+        )
     }
 }
 
@@ -168,16 +222,24 @@ pub struct JConfig {
 
 define_type!(JConfig, "dev/sanmer/email/Lettre$Config");
 
-impl JConfig {
-    fn from_java<'ctx>(ctx: &'ctx Context, config: Object<'ctx, Self>) -> Self {
-        Self {
-            server: get_string!(ctx, config, "getServer"),
-            port: get!(ctx, config, "getPort"),
-            username: get_string!(ctx, config, "getUsername"),
-            password: get_string!(ctx, config, "getPassword"),
-        }
+impl From<Object<'_, JConfig>> for JConfig {
+    fn from(value: Object<'_, JConfig>) -> Self {
+        Context::with_attached(|ctx| Self {
+            server: get_string!(ctx, value, "getServer"),
+            port: get!(ctx, value, "getPort"),
+            username: get_string!(ctx, value, "getUsername"),
+            password: get_string!(ctx, value, "getPassword"),
+        })
     }
+}
 
+impl Display for JConfig {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}", self.server, self.port)
+    }
+}
+
+impl JConfig {
     fn port(&self) -> u16 {
         u16::try_from(self.port).unwrap_or(465)
     }
@@ -202,24 +264,29 @@ impl JLettre {
         Ok(Self { transport })
     }
 
-    fn send(self, message: &Message) -> Result<(), SmtpError> {
-        self.transport.send(message).map(|_| ())
+    fn send(self, message: &Message) -> Result<String, SmtpError> {
+        self.transport.send(message).map(|r| {
+            let message: Vec<&str> = r.message().collect();
+            message.join(", ")
+        })
     }
 }
 
 #[no_mangle]
 pub extern "C" fn Java_dev_sanmer_email_Lettre_send<'ctx>(
-    ctx: &'ctx Context,
+    _ctx: &'ctx Context,
     _class: Class<'ctx, JLettre>,
     config: Object<'ctx, JConfig>,
     message: Object<'ctx, JMessage>,
 ) {
-    let config = JConfig::from_java(ctx, config);
-    let message = skip!(JMessage::from_java(ctx, message));
-    log::debug!("{:?}", message);
-    let message = skip!(message.try_into());
-    let lettre = skip!(JLettre::build(&config));
-    skip!(lettre.send(&message));
+    let config = JConfig::from(config);
+    log::debug!("Server: {config}");
+    let message = or_throw!(JMessage::try_from(message));
+    log::debug!("Message: {message}");
+    let message = or_throw!(message.try_into());
+    let lettre = or_throw!(JLettre::build(&config));
+    let server_msg = or_throw!(lettre.send(&message));
+    log::debug!("Server: {server_msg}")
 }
 
 #[no_mangle]
