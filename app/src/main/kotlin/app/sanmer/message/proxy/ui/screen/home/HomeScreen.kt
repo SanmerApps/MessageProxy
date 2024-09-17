@@ -61,7 +61,7 @@ fun HomeScreen(
                 .nestedScroll(scrollBehavior.nestedScrollConnection)
                 .verticalScroll(rememberScrollState())
                 .padding(contentPadding)
-                .padding(vertical = 20.dp),
+                .padding(all = 20.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             StateItem(
