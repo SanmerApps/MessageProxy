@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace = "dev.sanmer.email"
+    namespace = "dev.sanmer.lettre"
 
     defaultConfig {
         ndk.abiFilters += listOf("arm64-v8a", "x86_64")

@@ -108,7 +108,7 @@ pub struct JAddress {
     domain: String,
 }
 
-define_type!(JAddress, "dev/sanmer/email/Address");
+define_type!(JAddress, "dev/sanmer/lettre/Address");
 
 impl From<Object<'_, JAddress>> for JAddress {
     fn from(value: Object<'_, JAddress>) -> Self {
@@ -133,7 +133,7 @@ pub struct JMailbox {
     email: Address,
 }
 
-define_type!(JMailbox, "dev/sanmer/email/Mailbox");
+define_type!(JMailbox, "dev/sanmer/lettre/Mailbox");
 
 impl TryFrom<Object<'_, JMailbox>> for JMailbox {
     type Error = AddressError;
@@ -168,7 +168,7 @@ pub struct JMessage {
     body: String,
 }
 
-define_type!(JMessage, "dev/sanmer/email/Message");
+define_type!(JMessage, "dev/sanmer/lettre/Message");
 
 impl TryFrom<Object<'_, JMessage>> for JMessage {
     type Error = AddressError;
@@ -220,7 +220,7 @@ pub struct JConfig {
     password: String,
 }
 
-define_type!(JConfig, "dev/sanmer/email/Lettre$Config");
+define_type!(JConfig, "dev/sanmer/lettre/Lettre$Config");
 
 impl From<Object<'_, JConfig>> for JConfig {
     fn from(value: Object<'_, JConfig>) -> Self {
@@ -249,7 +249,7 @@ pub struct JLettre {
     transport: SmtpTransport,
 }
 
-define_type!(JLettre, "dev/sanmer/email/Lettre");
+define_type!(JLettre, "dev/sanmer/lettre/Lettre");
 
 impl JLettre {
     fn build(config: &JConfig) -> Result<Self, SmtpError> {
@@ -273,7 +273,7 @@ impl JLettre {
 }
 
 #[no_mangle]
-pub extern "C" fn Java_dev_sanmer_email_Lettre_send<'ctx>(
+pub extern "C" fn Java_dev_sanmer_lettre_Lettre_send<'ctx>(
     _ctx: &'ctx Context,
     _class: Class<'ctx, JLettre>,
     config: Object<'ctx, JConfig>,

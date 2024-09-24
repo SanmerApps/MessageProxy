@@ -79,7 +79,7 @@ android {
 }
 
 dependencies {
-    implementation(projects.jni)
+    implementation(projects.liblettre)
 
     implementation(libs.accompanist.permissions)
     implementation(libs.androidx.activity.compose)

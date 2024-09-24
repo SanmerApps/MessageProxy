@@ -1,1 +1,0 @@
--keep class dev.sanmer.email.* { *; }

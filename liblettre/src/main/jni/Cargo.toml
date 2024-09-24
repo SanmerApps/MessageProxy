@@ -1,10 +1,11 @@
 [package]
-name = "jni"
+name = "liblettre-jni"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
-crate-type = ["lib", "cdylib"]
+name = "lettre_jni"
+crate-type = ["cdylib"]
 
 [dependencies]
 android_logger = { version = "0.14", default-features = false }

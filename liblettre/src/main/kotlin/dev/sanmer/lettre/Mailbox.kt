@@ -1,6 +1,6 @@
-package dev.sanmer.email
+package dev.sanmer.lettre
 
-import dev.sanmer.email.Address.Default.toAddress
+import dev.sanmer.lettre.Address.Default.toAddress
 
 data class Mailbox(
     val name: String,

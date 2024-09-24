@@ -15,9 +15,9 @@ import app.sanmer.message.proxy.ktx.toLocalDateTime
 import app.sanmer.message.proxy.repository.LogRepository
 import app.sanmer.message.proxy.repository.PreferenceRepository
 import dagger.hilt.android.AndroidEntryPoint
-import dev.sanmer.email.Lettre
-import dev.sanmer.email.Mailbox
-import dev.sanmer.email.Message
+import dev.sanmer.lettre.Lettre
+import dev.sanmer.lettre.Mailbox
+import dev.sanmer.lettre.Message
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob

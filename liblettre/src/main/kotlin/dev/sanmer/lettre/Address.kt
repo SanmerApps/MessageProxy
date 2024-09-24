@@ -1,4 +1,4 @@
-package dev.sanmer.email
+package dev.sanmer.lettre
 
 data class Address(
     val user: String,

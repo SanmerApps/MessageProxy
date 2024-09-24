@@ -1,8 +1,8 @@
-package dev.sanmer.email
+package dev.sanmer.lettre
 
 object Lettre {
     init {
-        System.loadLibrary("lettre-jni")
+        System.loadLibrary("lettre_jni")
     }
 
     external fun send(config: Config, message: Message)
