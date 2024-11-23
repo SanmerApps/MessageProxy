@@ -9,7 +9,10 @@ use lettre::{Address, Message, SmtpTransport, Transport};
 use log::LevelFilter;
 use std::fmt::{Display, Formatter};
 use typed_jni::sys::{jint, JavaVM, JNI_VERSION_1_6};
-use typed_jni::{Class, Context, JString, Object, ObjectType, Signature, Type};
+use typed_jni::{
+    Context, JString, LocalObject, NoArgs, ObjectType, Signature, TrampolineClass,
+    TrampolineObject, Type,
+};
 
 macro_rules! define_type {
     ($target:ident, $sig:expr) => {
@@ -23,20 +26,20 @@ macro_rules! define_type {
 
 macro_rules! get_object {
     ($ctx:expr, $obj:expr, $name:expr) => {
-        Option::unwrap($obj.call_method($ctx, $name, ()).unwrap())
+        $obj.call_method($ctx, $name, NoArgs).unwrap()
     };
 }
 
 macro_rules! get_string {
     ($ctx:expr, $obj:expr, $name:expr) => {{
-        let obj: Object<JString> = get_object!($ctx, $obj, $name);
+        let obj: LocalObject<JString> = get_object!($ctx, $obj, $name);
         obj.get_string($ctx)
     }};
 }
 
 macro_rules! get {
     ($ctx:expr, $obj:expr, $name:expr) => {
-        $obj.call_method($ctx, $name, ()).unwrap()
+        $obj.call_method($ctx, $name, NoArgs).unwrap()
     };
 }
 
@@ -110,8 +113,8 @@ pub struct JAddress {
 
 define_type!(JAddress, "dev/sanmer/lettre/Address");
 
-impl From<Object<'_, JAddress>> for JAddress {
-    fn from(value: Object<'_, JAddress>) -> Self {
+impl From<LocalObject<'_, JAddress>> for JAddress {
+    fn from(value: LocalObject<'_, JAddress>) -> Self {
         Context::with_attached(|ctx| Self {
             user: get_string!(ctx, value, "getUser"),
             domain: get_string!(ctx, value, "getDomain"),
@@ -135,12 +138,12 @@ pub struct JMailbox {
 
 define_type!(JMailbox, "dev/sanmer/lettre/Mailbox");
 
-impl TryFrom<Object<'_, JMailbox>> for JMailbox {
+impl TryFrom<LocalObject<'_, JMailbox>> for JMailbox {
     type Error = AddressError;
 
-    fn try_from(value: Object<'_, JMailbox>) -> Result<Self, Self::Error> {
+    fn try_from(value: LocalObject<'_, JMailbox>) -> Result<Self, Self::Error> {
         Context::with_attached(|ctx| {
-            let email: Object<JAddress> = get_object!(ctx, value, "getEmail");
+            let email: LocalObject<JAddress> = get_object!(ctx, value, "getEmail");
             let email = JAddress::from(email);
             Ok(Self {
                 name: get_string!(ctx, value, "getName"),
@@ -170,14 +173,14 @@ pub struct JMessage {
 
 define_type!(JMessage, "dev/sanmer/lettre/Message");
 
-impl TryFrom<Object<'_, JMessage>> for JMessage {
+impl TryFrom<TrampolineObject<'_, JMessage>> for JMessage {
     type Error = AddressError;
 
-    fn try_from(value: Object<'_, JMessage>) -> Result<Self, Self::Error> {
+    fn try_from(value: TrampolineObject<'_, JMessage>) -> Result<Self, Self::Error> {
         Context::with_attached(|ctx| {
-            let from: Object<JMailbox> = get_object!(ctx, value, "getFrom");
+            let from: LocalObject<JMailbox> = get_object!(ctx, value, "getFrom");
             let from = JMailbox::try_from(from)?;
-            let to: Object<JMailbox> = get_object!(ctx, value, "getTo");
+            let to: LocalObject<JMailbox> = get_object!(ctx, value, "getTo");
             let to = JMailbox::try_from(to)?;
             Ok(Self {
                 from: from.into(),
@@ -222,8 +225,8 @@ pub struct JConfig {
 
 define_type!(JConfig, "dev/sanmer/lettre/Lettre$Config");
 
-impl From<Object<'_, JConfig>> for JConfig {
-    fn from(value: Object<'_, JConfig>) -> Self {
+impl From<TrampolineObject<'_, JConfig>> for JConfig {
+    fn from(value: TrampolineObject<'_, JConfig>) -> Self {
         Context::with_attached(|ctx| Self {
             server: get_string!(ctx, value, "getServer"),
             port: get!(ctx, value, "getPort"),
@@ -275,9 +278,9 @@ impl JLettre {
 #[no_mangle]
 pub extern "C" fn Java_dev_sanmer_lettre_Lettre_send<'ctx>(
     _ctx: &'ctx Context,
-    _class: Class<'ctx, JLettre>,
-    config: Object<'ctx, JConfig>,
-    message: Object<'ctx, JMessage>,
+    _class: TrampolineClass<'ctx, JLettre>,
+    config: TrampolineObject<'ctx, JConfig>,
+    message: TrampolineObject<'ctx, JMessage>,
 ) {
     let config = JConfig::from(config);
     log::debug!("Server: {config}");
